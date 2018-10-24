@@ -1,2 +1,2 @@
 # gwallet
-gravity wallet
+Gravity wallet
