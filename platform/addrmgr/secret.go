@@ -1,0 +1,250 @@
+package addrmgr
+
+import (
+	"crypto/rand"
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/binary"
+	"errors"
+	"golang.org/x/crypto/nacl/secretbox"
+	"golang.org/x/crypto/scrypt"
+	"io"
+	"runtime/debug"
+)
+
+var (
+	rng = rand.Reader
+)
+
+// Error types and messages.
+var (
+	ErrInvalidPassword = errors.New("invalid password")
+	ErrMalformed       = errors.New("malformed data")
+	ErrDecryptFailed   = errors.New("unable to decrypt")
+)
+
+// Various constants needed for encryption scheme.
+const (
+	// Expose secretbox's Overhead const here for convenience.
+	Overhead  = secretbox.Overhead
+	KeySize   = 32
+	NonceSize = 24
+	DefaultN  = 262144 // 2^14
+	DefaultR  = 8
+	DefaultP  = 1
+)
+// CryptoKey redefine []byte
+type CryptoKey [KeySize]byte
+
+// Encrypt encrypts the passed data.
+func (ck *CryptoKey) Encrypt(in []byte) ([]byte, error) {
+	var nonce [NonceSize]byte
+	_, err := io.ReadFull(rng, nonce[:])
+	if err != nil {
+		return nil, err
+	}
+	blob := secretbox.Seal(nil, in, &nonce, (*[KeySize]byte)(ck))
+	return append(nonce[:], blob...), nil
+}
+
+// Decrypt decrypts the passed data.  The must be the output of the Encrypt
+// function.
+func (ck *CryptoKey) Decrypt(in []byte) ([]byte, error) {
+	if len(in) < NonceSize {
+		return nil, ErrMalformed
+	}
+
+	var nonce [NonceSize]byte
+	copy(nonce[:], in[:NonceSize])
+	blob := in[NonceSize:]
+
+	opened, ok := secretbox.Open(nil, blob, &nonce, (*[KeySize]byte)(ck))
+	if !ok {
+		return nil, ErrDecryptFailed
+	}
+
+	return opened, nil
+}
+
+// Bytes change CryptoKey to []byte
+func (ck *CryptoKey) Bytes() []byte {
+	return ck[:]
+}
+
+// Zero clear CryptoKey
+func (ck *CryptoKey) Zero() {
+	bytea32((*[KeySize]byte)(ck))
+}
+
+// GenerateCryptoKey generates a new crypotgraphically random key.
+func GenerateCryptoKey() (*CryptoKey, error) {
+	var key CryptoKey
+	_, err := io.ReadFull(rng, key[:])
+	if err != nil {
+		return nil, err
+	}
+
+	return &key, nil
+}
+
+// Parameters are not secret and can be stored in plain text.
+type Parameters struct {
+	Salt   [KeySize]byte
+	Digest [sha256.Size]byte
+	N      int
+	R      int
+	P      int
+}
+
+// SecretKey  all the information needed to support SecretKey
+type SecretKey struct {
+	Key        *CryptoKey
+	Parameters Parameters
+}
+
+// deriveKey fills out the Key field.
+func (sk *SecretKey) deriveKey(password *[]byte) error {
+	key, err := scrypt.Key(*password, sk.Parameters.Salt[:],
+		sk.Parameters.N,
+		sk.Parameters.R,
+		sk.Parameters.P,
+		len(sk.Key))
+	if err != nil {
+		return err
+	}
+	copy(sk.Key[:], key)
+	Bytes(key)
+
+	// I'm not a fan of forced garbage collections, but scrypt allocates a
+	// ton of memory and calling it back to back without a GC cycle in
+	// between means you end up needing twice the amount of memory.  For
+	// example, if your scrypt parameters are such that you require 1GB and
+	// you call it twice in a row, without this you end up allocating 2GB
+	// since the first GB probably hasn't been released yet.
+	debug.FreeOSMemory()
+
+	// I'm not a fan of forced garbage collections, but scrypt allocates a
+	// ton of memory and calling it back to back without a GC cycle in
+	// between means you end up needing twice the amount of memory.  For
+	// example, if your scrypt parameters are such that you require 1GB and
+	// you call it twice in a row, without this you end up allocating 2GB
+	// since the first GB probably hasn't been released yet.
+	debug.FreeOSMemory()
+
+	return nil
+}
+
+// Marshal returns the Parameters field marshalled into a format suitable for
+// storage.  This result of this can be stored in clear text.
+func (sk *SecretKey) Marshal() []byte {
+	params := &sk.Parameters
+
+	marshaled := make([]byte, KeySize+sha256.Size+24)
+
+	b := marshaled
+	copy(b[:KeySize], params.Salt[:])
+	b = b[KeySize:]
+	copy(b[:sha256.Size], params.Digest[:])
+	b = b[sha256.Size:]
+	binary.LittleEndian.PutUint64(b[:8], uint64(params.N))
+	b = b[8:]
+	binary.LittleEndian.PutUint64(b[:8], uint64(params.R))
+	b = b[8:]
+	binary.LittleEndian.PutUint64(b[:8], uint64(params.P))
+
+	return marshaled
+}
+
+// Unmarshal SecretKey deserialize
+func (sk *SecretKey) Unmarshal(marshaled []byte) error {
+	if sk.Key == nil {
+		sk.Key = (*CryptoKey)(&[KeySize]byte{})
+	}
+	if len(marshaled) != KeySize+sha256.Size+24 {
+		return ErrMalformed
+	}
+
+	params := &sk.Parameters
+	copy(params.Salt[:], marshaled[:KeySize])
+	marshaled = marshaled[KeySize:]
+	copy(params.Digest[:], marshaled[:sha256.Size])
+	marshaled = marshaled[sha256.Size:]
+	params.N = int(binary.LittleEndian.Uint64(marshaled[:8]))
+	marshaled = marshaled[8:]
+	params.R = int(binary.LittleEndian.Uint64(marshaled[:8]))
+	marshaled = marshaled[8:]
+	params.P = int(binary.LittleEndian.Uint64(marshaled[:8]))
+
+	return nil
+}
+
+// Zero zeroes the underlying secret key while leaving the parameters intact.
+// This effectively makes the key unusable until it is derived again via the
+// DeriveKey function.
+func (sk *SecretKey) Zero() {
+	sk.Key.Zero()
+}
+
+// DeriveKey derives the underlying secret key and ensures it matches the
+// expected digest.  This should only be called after previously calling the
+// Zero function or on an initial DecodeAccountInfo.
+func (sk *SecretKey) DeriveKey(password *[]byte) error {
+	if err := sk.deriveKey(password); err != nil {
+		return err
+	}
+
+	// verify password
+	digest := sha256.Sum256(sk.Key[:])
+	if subtle.ConstantTimeCompare(digest[:], sk.Parameters.Digest[:]) != 1 {
+		return ErrInvalidPassword
+	}
+
+	return nil
+}
+
+// Encrypt encrypts in bytes and returns a JSON blob.
+func (sk *SecretKey) Encrypt(in []byte) ([]byte, error) {
+	return sk.Key.Encrypt(in)
+}
+
+// Decrypt takes in a JSON blob and returns it's decrypted form.
+func (sk *SecretKey) Decrypt(in []byte) ([]byte, error) {
+	return sk.Key.Decrypt(in)
+}
+
+// NewSecretKey returns a SecretKey structure based on the passed parameters.
+func NewSecretKey(password *[]byte, N, r, p int) (*SecretKey, error) {
+	sk := SecretKey{
+		Key: (*CryptoKey)(&[KeySize]byte{}),
+	}
+	// setup parameters
+	sk.Parameters.N = N
+	sk.Parameters.R = r
+	sk.Parameters.P = p
+	_, err := io.ReadFull(rng, sk.Parameters.Salt[:])
+	if err != nil {
+		return nil, err
+	}
+
+	// derive key
+	err = sk.deriveKey(password)
+	if err != nil {
+		return nil, err
+	}
+
+	// store digest
+	sk.Parameters.Digest = sha256.Sum256(sk.Key[:])
+
+	return &sk, nil
+}
+
+func bytea32(b *[32]byte) {
+	*b = [32]byte{}
+}
+
+// Bytes clear SecretKey
+func Bytes(b []byte) {
+	for i := range b {
+		b[i] = 0
+	}
+}

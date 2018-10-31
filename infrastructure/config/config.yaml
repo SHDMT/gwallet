@@ -1,0 +1,44 @@
+# 参考hcashd.conf写该yaml文件
+HomeDir: 'gravity'
+DataDir: 'data'
+
+LogDir: 'logs'
+LogName: 'gravity.log'
+LogLevel: 0  # Debug
+#LogLevel: 1  # Info
+#LogLevel: 2  # Warn
+#LogLevel: 3  # Error
+#LogLevel: 4  # Fatal
+#LogLevel: 5  # Trace
+MaxLogSize: 100 # in MB
+
+NetType: 1  # MainNet
+#NetType: 2 #TestNet
+#NetType: 3 #SimNet
+
+EnableUpnp: true
+
+Peers: ['10.0.0.1', '10.0.0.2:19008','fe80::1','[fe80::2]:14008']
+MaxPeers: 10
+
+Listen:
+ - ''         # empty: all interfaces on default port
+ - '0.0.0.0'  # all ipv4 interfaces on default port
+ - '0.0.0.0:14008' # all ipv4 interfaces on port 14008
+ - ':14008'   # all ipv4 interfaces on port 14008
+ - '[::]:14008' # all ipv6 interfaces on port 14008
+ - '::'         # all ipv6 interfaces on default port
+ - '127.0.0.1:14008' # ipv4 localhost on port 14008
+ - '[::1]:14008' # ipv6 localhost on port 14008
+NoListen: false     # if true, this will override all listeners and disable listening for incoming connections
+
+RpcUser: Daniel
+RpcPassword: HjWp0fbNrbOFZ2S8RvddnW6CK8g=
+RpcMaxClients: 10
+NoRpc: false      # if true, will disable rpc server
+
+# Add whitelisted IP networks and IPs. Connected peers whose IP matches a whitelist will not have their ban score increased.
+WhiteList: ['10.0.0.1', '::1','fe80::1','192.168.0.0/24','fd00::/16']
+BlackList: ['10.0.0.1', '::1','fe80::1','192.168.0.0/24','fd00::/16']
+
+NoDnsSeed: false  # if true, enable DNS seeding for peers

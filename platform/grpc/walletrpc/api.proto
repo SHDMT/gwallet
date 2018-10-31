@@ -1,0 +1,261 @@
+syntax ="proto3";
+
+package walletrpc;
+
+service AccountService{
+    rpc GetNewAddress(AddressRequest)   returns (AddressResponse);
+    rpc GetBalance(BalanceRequest) returns(BalanceResponse);
+    rpc GetPaymentHistory(HistoryRequest) returns(PaymentHistoryResponse);
+    rpc GetPaymentMessageInfo(MessageInfoRequest) returns(PaymentMessageInfoResponse);
+    rpc SendToMany(SendToManyRequest) returns (SendPaymentResponse);
+    rpc SendText(SendTextRequest) returns (SendTextResponse);
+    rpc SendRawUnit(SendRawUnitRequest) returns (SendRawUnitResponse);
+    rpc ValidateAddress(ValidateAddressRequest) returns (ValidateAddressResponse);
+    rpc CreateNewAccount(CreateNewAccountRequest) returns (CreateNewAccountResponse);
+    rpc DumpPrivateKey(DumpPrivateKeyRequest) returns (DumpPrivateKeyResponse);
+    rpc ImportPrivateKey(ImportPrivateKeyRequest) returns (ImportPrivateKeyResponse);
+    rpc InvokeContract(InvokeContractRequest) returns (InvokeContractResponse);
+    rpc IssueContract(IssueContractRequest) returns (IssueContractResponse);
+    rpc DeployContract(DeployContractRequest) returns (DeployContractResponse);
+    rpc UpdatePassword(UpdatePasswordRequest) returns (UpdatePasswordResponse);
+    rpc RescanWallet(RescanWalletRequest) returns (RescanWalletResponse);
+    rpc GetAllAssets(AllAssetsRequest) returns (AllAssetsResponse);
+    rpc IsOfficial(IsOfficialRequest) returns (IsOfficialResponse);
+
+    rpc InvokeContractWithJson(InvokeContractWithJsonRequest) returns (InvokeContractWithJsonResponse);
+    rpc IssueAssetWithJson(IssueAssetWithJsonRequest) returns (IssueAssetWithJsonResponse);
+    rpc DeployContractWithJson(DeployContractWithJsonRequest) returns (DeployContractWithJsonResponse);
+}
+
+message AddressRequest{
+    string accountNameString = 1;
+}
+
+message AddressResponse{
+    string addressString = 1;
+}
+
+message BalanceRequest{
+    string accountInfoName = 1;
+    string accountInfoAssetHash = 2;
+}
+
+message AssetBalance{
+    string  assetName = 1;
+    string  assetTotal=2;
+    string  assetSpendable=3;
+    string  assetUnconfirmed =4;
+}
+
+message AccountBalance{
+    string  balanceAccountName =1 ;
+    repeated AssetBalance balanceAsset   = 2;
+}
+
+message BalanceResponse{
+    repeated  AccountBalance balances =1;
+}
+
+message HistoryRequest{
+    string accountName=1;
+    uint64 fromMCI=2;
+    uint64 count=3;
+}
+
+
+message PaymentHistoryResponse{
+    bytes paymentHistory =1;
+}
+
+
+message MessageInfoRequest{
+    bytes unitHash =1;
+    uint32 messageId=2;
+}
+
+message PaymentMessageInfoResponse{
+    bytes paymentInfo=1;
+}
+
+message  SendToManyRequest{
+    string sendPaymentAccount = 1;
+    map<string,uint64>  sendPairs = 2;
+    bool send     = 3;
+}
+
+message SendPaymentResponse{
+    bytes sendPaymentResult = 1;
+    uint64 commission        = 2;
+}
+
+message SendTextRequest{
+    string sendTextAccount =1;
+    string textContent=2;
+    bool send   = 3;
+}
+
+message SendTextResponse{
+    bytes sendTextResult = 1;
+    uint64 commission     = 2;
+}
+
+message SendRawUnitRequest{
+    bytes rawUnit = 1;
+}
+
+message SendRawUnitResponse{
+    bytes sendRawUnitResult = 1;
+}
+
+message CreateNewAccountRequest{
+    string account = 1;
+    uint32 acctType = 2;
+}
+
+message CreateNewAccountResponse{
+    string address = 1;
+}
+
+message ValidateAddressRequest{
+    string address = 1;
+}
+
+message ValidateAddressResponse{
+    string  address = 1;
+    bool    isValid = 2;
+    bool    isMine  = 3;
+    string  account = 4;
+    string  pubKeyAddr  = 5;
+    string  pubKey  = 6;
+}
+
+message DumpPrivateKeyRequest{
+    string address      = 1;
+}
+
+message DumpPrivateKeyResponse{
+    string privKey      = 1;
+}
+
+message ImportPrivateKeyRequest{
+    string privKey      = 1;
+}
+
+message ImportPrivateKeyResponse{
+    string address      = 1;
+}
+
+message InvokeContractRequest{
+    string account      =   1;
+    bytes asset         =   2;
+    bytes contract      =   3;
+    repeated uint64 amountList = 4;
+    bytes params        =   5;
+    bool  send          =   6;
+}
+
+message InvokeContractResponse{
+    bytes unitHash      =   1;
+    uint64 commission   =   2;
+}
+
+message ContractDef{
+    bytes address                    = 1;
+    repeated string paramKey        = 2;
+    repeated bytes paramValue       = 3;
+}
+
+message IssueContractRequest{
+    string  assetName                   = 1;
+    int64   assetCap                    = 2;
+    bool fixedDenominations             = 3;
+    repeated uint32 denominations      = 4;
+    repeated bytes contracts           = 5;
+    repeated bytes allocationAddr      = 6;
+    repeated int64 allocationAmount    = 7;
+    bytes publisherAddress              = 8;
+    bytes note                          = 9;
+    bool send                           = 10;
+}
+
+message IssueContractResponse{
+    bytes unitHash      = 1;
+    uint64 commission   = 2;
+}
+
+message DeployContractRequest{
+    repeated bytes contracts = 1;
+    bool send = 2;
+}
+
+message DeployContractResponse {
+    bytes unitHash = 1;
+    uint64 commission = 2;
+}
+
+message UpdatePasswordRequest{
+    string oldPassword = 1;
+    string newPassword = 2;
+}
+
+message UpdatePasswordResponse{
+
+}
+
+message RescanWalletRequest {
+    uint64 start    = 1;
+    uint64 end      = 2;
+}
+
+message RescanWalletResponse {
+
+}
+
+
+message AllAssetsRequest{}
+
+message AllAssetsResponse{
+    map<string,string> assets = 1;
+}
+message IsOfficialRequest{
+
+}
+
+message IsOfficialResponse{
+    bool isOfficial = 1;
+}
+
+
+message InvokeContractWithJsonRequest{
+    string paymentAccount       = 1;
+    uint64 amount               = 2;
+    bytes  invokeJson           = 3;
+    bool   send                 = 4;
+}
+
+message InvokeContractWithJsonResponse{
+    bytes unitHash = 1;
+    uint64 commission = 2;
+}
+
+message IssueAssetWithJsonRequest{
+    string paymentAccount       = 1;
+    bytes  issueJson            = 2;
+    bool   send                 = 3;
+}
+
+message IssueAssetWithJsonResponse{
+    bytes unitHash = 1;
+    uint64 commission = 2;
+}
+
+message DeployContractWithJsonRequest{
+    string paymentAccount       = 1;
+    bytes  deployJson           = 2;
+    bool   send                 = 3;
+}
+
+message DeployContractWithJsonResponse{
+    bytes unitHash = 1;
+    uint64 commission = 2;
+}

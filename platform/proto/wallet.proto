@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package proto;
+
+service Wallet{
+    rpc ReceiveMessage(Message)returns(Response);
+    rpc UpdateStates(State)returns(Response);
+    rpc UpdateMCI(MsgBucket)returns(Response);
+}
+
+message MsgBucket{
+    uint64 mci = 1;
+    repeated bytes stableMessagesUnit  =2;
+    repeated bytes stableMessages = 3;
+    repeated uint32 stableMessagesID = 4;
+    repeated bytes feeUTXOs = 5;
+    bool completed = 6;
+}
+
+message State{
+    uint64 mci = 1;
+    repeated bytes validUnits = 2;
+    repeated bytes invalidUnits = 3;
+    repeated bytes feeUTXOs = 4;
+}
+message Message{
+    bytes message = 1;
+    bytes unitHash = 2;
+    uint32 messageID = 3;
+}
+
+message Response{
+	uint32 response = 1;
+}
