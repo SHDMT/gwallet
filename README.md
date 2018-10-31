@@ -1,2 +1,2 @@
 # gwallet
-Gravity wallet
+Gravity wallet release 0.1 
