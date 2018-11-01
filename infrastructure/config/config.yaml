@@ -1,4 +1,3 @@
-# 参考hcashd.conf写该yaml文件
 HomeDir: 'gravity'
 DataDir: 'data'
 
